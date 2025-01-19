@@ -3,22 +3,21 @@ from pydantic import BaseModel
 from instagram_private_api import Client, ClientError
 import os
 import json
+import base64
 
 app = FastAPI()
 
 class UnfollowersRequest(BaseModel):
     username: str
+    password: str
     target_username: str
 
-# Ortam değişkeninden oturum bilgilerini yükle
 def load_session_from_env():
-  def load_session_from_env():
+    """Ortam değişkeninden oturum bilgilerini yükler."""
     session_json = os.getenv("INSTAGRAM_SESSION")
     if not session_json:
         raise Exception("No session data found in environment variables")
     session_data = json.loads(session_json)
-
-    # Base64 ile encode edilmiş verileri çöz
     for key, value in session_data.items():
         if isinstance(value, str):
             try:
@@ -27,9 +26,25 @@ def load_session_from_env():
                 pass
     return session_data
 
+def save_session_to_env(api):
+    """Yeni oturum bilgilerini ortam değişkenine kaydeder."""
+    settings = api.settings
+    for key, value in settings.items():
+        if isinstance(value, bytes):
+            settings[key] = base64.b64encode(value).decode("utf-8")
+    os.environ["INSTAGRAM_SESSION"] = json.dumps(settings)
 
-# Kullanıcının tüm takipçilerini al
+def recreate_session(username, password):
+    """Oturum bilgileri geçersiz olduğunda yeni bir oturum oluştur."""
+    try:
+        api = Client(username, password)
+        save_session_to_env(api)
+        return api.settings
+    except Exception as e:
+        raise Exception(f"Failed to recreate session: {e}")
+
 def get_all_followers(api, user_id):
+    """Kullanıcının tüm takipçilerini al."""
     followers = []
     rank_token = api.generate_uuid()
     next_max_id = ""
@@ -39,8 +54,8 @@ def get_all_followers(api, user_id):
         next_max_id = response.get("next_max_id")
     return set(followers)
 
-# Kullanıcının tüm takip ettiklerini al
 def get_all_followees(api, user_id):
+    """Kullanıcının tüm takip ettiklerini al."""
     followees = []
     rank_token = api.generate_uuid()
     next_max_id = ""
@@ -53,10 +68,13 @@ def get_all_followees(api, user_id):
 @app.post("/unfollowers/")
 async def get_unfollowers(data: UnfollowersRequest):
     try:
-        # Ortam değişkeninden oturum bilgilerini al
-        session_data = load_session_from_env()
+        # Oturum bilgilerini yükle veya yeniden oluştur
+        try:
+            session_data = load_session_from_env()
+        except Exception:
+            session_data = recreate_session(data.username, data.password)
 
-        # Instagram API'yi oturum bilgileriyle başlat
+        # Instagram API'yi başlat
         api = Client(data.username, None, settings=session_data)
 
         # Hedef kullanıcının takipçi ve takip edilen bilgilerini al
