@@ -12,10 +12,21 @@ class UnfollowersRequest(BaseModel):
 
 # Ortam değişkeninden oturum bilgilerini yükle
 def load_session_from_env():
+  def load_session_from_env():
     session_json = os.getenv("INSTAGRAM_SESSION")
     if not session_json:
         raise Exception("No session data found in environment variables")
-    return json.loads(session_json)
+    session_data = json.loads(session_json)
+
+    # Base64 ile encode edilmiş verileri çöz
+    for key, value in session_data.items():
+        if isinstance(value, str):
+            try:
+                session_data[key] = base64.b64decode(value.encode("utf-8"))
+            except (ValueError, TypeError):
+                pass
+    return session_data
+
 
 # Kullanıcının tüm takipçilerini al
 def get_all_followers(api, user_id):
