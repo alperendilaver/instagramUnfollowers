@@ -1,58 +1,92 @@
-import os
-import base64
 from fastapi import FastAPI, HTTPException
-import instaloader
+from pydantic import BaseModel
+from instagram_private_api import Client, ClientError
+import os
+import json
+import base64
 
 app = FastAPI()
 
-def get_instagram_follow_data(base64_session: str, username: str):
-    """
-    Instagram takipçi ve takip edilen verilerini alır.
-    """
+class UnfollowersRequest(BaseModel):
+    username: str
+    password: str
+    target_username: str
+
+def load_session_from_env():
+    """Ortam değişkeninden oturum bilgilerini yükler."""
+    session_json = os.getenv("INSTAGRAM_SESSION")
+    if not session_json:
+        raise Exception("No session data found in environment variables")
+    session_data = json.loads(session_json)
+    for key, value in session_data.items():
+        if isinstance(value, str):
+            try:
+                session_data[key] = base64.b64decode(value.encode("utf-8"))
+            except (ValueError, TypeError):
+                pass
+    return session_data
+
+def save_session_to_env(api):
+    """Yeni oturum bilgilerini ortam değişkenine kaydeder."""
+    settings = api.settings
+    for key, value in settings.items():
+        if isinstance(value, bytes):
+            settings[key] = base64.b64encode(value).decode("utf-8")
+    os.environ["INSTAGRAM_SESSION"] = json.dumps(settings)
+
+def recreate_session(username, password):
+    """Oturum bilgileri geçersiz olduğunda yeni bir oturum oluştur."""
     try:
-        # Base64 formatındaki session verisini çöz
-        session_data = base64.b64decode(base64_session)
-
-        # Geçici dosya için /tmp dizinini kullan
-        temp_session_file = "/tmp/session"
-
-        # Geçici session dosyasını oluştur
-        with open(temp_session_file, "wb") as f:
-            f.write(session_data)
-
-        # Instaloader ile session yükle
-        instagram = instaloader.Instaloader()
-
-        # Doğrudan tam dosya yolunu kullanarak session yükle
-        instagram.load_session_from_file(username=username, filename=temp_session_file)
-
-        # Instagram profiline erişim
-        profile = instaloader.Profile.from_username(instagram.context, username)
-
-        followers = [f.username for f in profile.get_followers()]
-        followees = [f.username for f in profile.get_followees()]
-
-        return followers, followees
+        api = Client(username, password)
+        save_session_to_env(api)
+        return api.settings
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Hata: {str(e)}")
-    finally:
-        # Geçici dosyayı temizle
-        if os.path.exists(temp_session_file):
-            os.remove(temp_session_file)
+        raise Exception(f"Failed to recreate session: {e}")
 
-@app.get("/unfollowers")
-def get_unfollowers(username: str):
-    """
-    Geri takip etmeyen kullanıcıları döner.
-    """
-    # Environment değişkeninden session bilgisi al
-    base64_session = os.getenv("INSTAGRAM_SESSION")
-    if not base64_session:
-        raise HTTPException(status_code=500, detail="Session bilgisi bulunamadı.")
+def get_all_followers(api, user_id):
+    """Kullanıcının tüm takipçilerini al."""
+    followers = []
+    rank_token = api.generate_uuid()
+    next_max_id = ""
+    while next_max_id is not None:
+        response = api.user_followers(user_id, rank_token=rank_token, max_id=next_max_id)
+        followers.extend([f["username"] for f in response["users"]])
+        next_max_id = response.get("next_max_id")
+    return set(followers)
 
-    # Takipçi ve takip edilenleri al
-    followers, followees = get_instagram_follow_data(base64_session, username)
+def get_all_followees(api, user_id):
+    """Kullanıcının tüm takip ettiklerini al."""
+    followees = []
+    rank_token = api.generate_uuid()
+    next_max_id = ""
+    while next_max_id is not None:
+        response = api.user_following(user_id, rank_token=rank_token, max_id=next_max_id)
+        followees.extend([f["username"] for f in response["users"]])
+        next_max_id = response.get("next_max_id")
+    return set(followees)
 
-    # Geri takip etmeyen kullanıcıları hesapla
-    unfollowers = [user for user in followees if user not in followers]
-    return {"unfollowers": unfollowers}
+@app.post("/unfollowers/")
+async def get_unfollowers(data: UnfollowersRequest):
+    try:
+        # Oturum bilgilerini yükle veya yeniden oluştur
+        try:
+            session_data = load_session_from_env()
+        except Exception:
+            session_data = recreate_session(data.username, data.password)
+
+        # Instagram API'yi başlat
+        api = Client(data.username, None, settings=session_data)
+
+        # Hedef kullanıcının takipçi ve takip edilen bilgilerini al
+        user_id = api.username_info(data.target_username)["user"]["pk"]
+        followers = get_all_followers(api, user_id)
+        followees = get_all_followees(api, user_id)
+
+        # Unfollowers hesapla
+        unfollowers = followees - followers
+        return {"unfollowers": list(unfollowers)}
+
+    except ClientError as e:
+        raise HTTPException(status_code=400, detail=f"Instagram API Error: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
