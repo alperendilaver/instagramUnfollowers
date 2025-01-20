@@ -5,13 +5,9 @@ import os
 import json
 import base64
 import asyncio
-import redis
 
 # FastAPI uygulaması başlat
 app = FastAPI()
-
-# Redis önbelleği yapılandır
-cache = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 # İstek modeli tanımla
 class UnfollowersRequest(BaseModel):
@@ -72,30 +68,12 @@ def get_all_followees(api, user_id):
         next_max_id = response.get("next_max_id", None)
     return followees
 
-# Redis önbelleğini kullanarak takipçileri alma
-def cache_followers(api, user_id):
-    followers_key = f"followers:{user_id}"
-    if cache.exists(followers_key):
-        return json.loads(cache.get(followers_key))
-    followers = get_all_followers(api, user_id)
-    cache.setex(followers_key, 3600, json.dumps(list(followers)))  # 1 saat önbellek
-    return followers
-
-# Redis önbelleğini kullanarak takip edilenleri alma
-def cache_followees(api, user_id):
-    followees_key = f"followees:{user_id}"
-    if cache.exists(followees_key):
-        return json.loads(cache.get(followees_key))
-    followees = get_all_followees(api, user_id)
-    cache.setex(followees_key, 3600, json.dumps(list(followees)))  # 1 saat önbellek
-    return followees
-
 # Asenkron takipçi ve takip edilen veri çekimi
 async def fetch_followers(api, user_id):
-    return await asyncio.to_thread(cache_followers, api, user_id)
+    return await asyncio.to_thread(get_all_followers, api, user_id)
 
 async def fetch_followees(api, user_id):
-    return await asyncio.to_thread(cache_followees, api, user_id)
+    return await asyncio.to_thread(get_all_followees, api, user_id)
 
 # Unfollowers API endpoint
 @app.post("/unfollowers/")
