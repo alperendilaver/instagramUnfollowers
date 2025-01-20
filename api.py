@@ -44,29 +44,25 @@ def recreate_session(username, password):
         raise Exception(f"Failed to recreate session: {e}")
 
 def get_all_followers(api, user_id):
-    """Kullanıcının tüm takipçilerini alır."""
+    """Kullanıcının tüm takipçilerini al."""
     followers = []
     rank_token = api.generate_uuid()
-    next_max_id = None
-    while next_max_id is not None or next_max_id == "":
+    next_max_id = ""
+    while next_max_id is not None:
         response = api.user_followers(user_id, rank_token=rank_token, max_id=next_max_id)
-        print("Followers Response:", response)  # API'den dönen verileri kontrol edin
         followers.extend([f["username"] for f in response["users"]])
-        next_max_id = response.get("next_max_id", None)
-    print("All Followers:", followers)  # Tüm takipçileri logla
+        next_max_id = response.get("next_max_id")
     return set(followers)
 
 def get_all_followees(api, user_id):
-    """Kullanıcının tüm takip ettiklerini alır."""
+    """Kullanıcının tüm takip ettiklerini al."""
     followees = []
     rank_token = api.generate_uuid()
-    next_max_id = None
-    while next_max_id is not None or next_max_id == "":
+    next_max_id = ""
+    while next_max_id is not None:
         response = api.user_following(user_id, rank_token=rank_token, max_id=next_max_id)
-        print("Followees Response:", response)  # API'den dönen verileri kontrol edin
         followees.extend([f["username"] for f in response["users"]])
-        next_max_id = response.get("next_max_id", None)
-    print("All Followees:", followees)  # Tüm takip edilenleri logla
+        next_max_id = response.get("next_max_id")
     return set(followees)
 
 @app.post("/unfollowers/")
@@ -83,17 +79,11 @@ async def get_unfollowers(data: UnfollowersRequest):
 
         # Hedef kullanıcının takipçi ve takip edilen bilgilerini al
         user_id = api.username_info(data.target_username)["user"]["pk"]
-        print("Target User ID:", user_id)  # Hedef kullanıcı ID'sini logla
         followers = get_all_followers(api, user_id)
         followees = get_all_followees(api, user_id)
 
-        # Küme logları
-        print(f"Followers Set: {followers}")
-        print(f"Followees Set: {followees}")
-
         # Unfollowers hesapla
         unfollowers = followees - followers
-        print("Unfollowers Set:", unfollowers)
         return {"unfollowers": list(unfollowers)}
 
     except ClientError as e:
