@@ -13,14 +13,18 @@ def get_instagram_follow_data(base64_session: str, username: str):
     try:
         # Base64 formatındaki session verisini çöz
         session_data = base64.b64decode(base64_session)
-        temp_session_file = "/tmp/instaloader_session"
+        temp_dir = "/tmp/instaloader-session"
+        temp_session_file = os.path.join(temp_dir, "session_file")
+
+        # Geçici dizin oluştur
+        os.makedirs(temp_dir, exist_ok=True)
 
         # Geçici session dosyasını oluştur
         with open(temp_session_file, "wb") as f:
             f.write(session_data)
 
         # Instaloader ile session yükle
-        instagram = instaloader.Instaloader()
+        instagram = instaloader.Instaloader(dirname_pattern=temp_dir)
         instagram.load_session_from_file(temp_session_file)
         profile = instaloader.Profile.from_username(instagram.context, username)
 
@@ -31,9 +35,11 @@ def get_instagram_follow_data(base64_session: str, username: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Hata: {str(e)}")
     finally:
-        # Geçici dosyayı sil
+        # Geçici dosyayı ve dizini sil
         if os.path.exists(temp_session_file):
             os.remove(temp_session_file)
+        if os.path.exists(temp_dir):
+            os.rmdir(temp_dir)
 
 @app.get("/unfollowers")
 def get_unfollowers(username: str):
