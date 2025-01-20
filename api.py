@@ -44,25 +44,27 @@ def recreate_session(username, password):
         raise Exception(f"Failed to recreate session: {e}")
 
 def get_all_followers(api, user_id):
-    """Kullanıcının tüm takipçilerini al."""
+    """Kullanıcının tüm takipçilerini alır."""
     followers = []
     rank_token = api.generate_uuid()
-    next_max_id = ""
-    while next_max_id is not None:
+    next_max_id = None
+    while next_max_id is not None or next_max_id == "":
         response = api.user_followers(user_id, rank_token=rank_token, max_id=next_max_id)
+        print("Followers Response:", response)  # Hangi verilerin döndüğünü kontrol edin
         followers.extend([f["username"] for f in response["users"]])
-        next_max_id = response.get("next_max_id")
+        next_max_id = response.get("next_max_id", None)
     return set(followers)
 
 def get_all_followees(api, user_id):
-    """Kullanıcının tüm takip ettiklerini al."""
+    """Kullanıcının tüm takip ettiklerini alır."""
     followees = []
     rank_token = api.generate_uuid()
-    next_max_id = ""
-    while next_max_id is not None:
+    next_max_id = None
+    while next_max_id is not None or next_max_id == "":
         response = api.user_following(user_id, rank_token=rank_token, max_id=next_max_id)
+        print("Followees Response:", response)  # Hangi verilerin döndüğünü kontrol edin
         followees.extend([f["username"] for f in response["users"]])
-        next_max_id = response.get("next_max_id")
+        next_max_id = response.get("next_max_id", None)
     return set(followees)
 
 @app.post("/unfollowers/")
@@ -84,6 +86,9 @@ async def get_unfollowers(data: UnfollowersRequest):
 
         # Unfollowers hesapla
         unfollowers = followees - followers
+        print("Followers:", followers)
+        print("Followees:", followees)
+        print("Unfollowers:", unfollowers)
         return {"unfollowers": list(unfollowers)}
 
     except ClientError as e:
