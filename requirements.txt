@@ -3,3 +3,4 @@ uvicorn==0.32.1
 pydantic==1.10.19
 instagram-private-api==1.6.0.0
 instaloader 
+redis
