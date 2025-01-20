@@ -81,9 +81,13 @@ async def get_unfollowers(data: UnfollowersRequest):
         user_id = api.username_info(data.target_username)["user"]["pk"]
         followers = get_all_followers(api, user_id)
         followees = get_all_followees(api, user_id)
-
-        # Unfollowers hesapla
-        unfollowers = followees - followers
+        
+        # Unfollowers hesapla (manuel kontrol)
+        unfollowers = []
+        for followee in followees:
+            if followee not in followers:
+                unfollowers.append(followee)
+        
         return {"unfollowers": list(unfollowers)}
 
     except ClientError as e:
