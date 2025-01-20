@@ -50,9 +50,10 @@ def get_all_followers(api, user_id):
     next_max_id = None
     while next_max_id is not None or next_max_id == "":
         response = api.user_followers(user_id, rank_token=rank_token, max_id=next_max_id)
-        print("Followers Response:", response)  # Hangi verilerin döndüğünü kontrol edin
+        print("Followers Response:", response)  # API'den dönen verileri kontrol edin
         followers.extend([f["username"] for f in response["users"]])
         next_max_id = response.get("next_max_id", None)
+    print("All Followers:", followers)  # Tüm takipçileri logla
     return set(followers)
 
 def get_all_followees(api, user_id):
@@ -62,9 +63,10 @@ def get_all_followees(api, user_id):
     next_max_id = None
     while next_max_id is not None or next_max_id == "":
         response = api.user_following(user_id, rank_token=rank_token, max_id=next_max_id)
-        print("Followees Response:", response)  # Hangi verilerin döndüğünü kontrol edin
+        print("Followees Response:", response)  # API'den dönen verileri kontrol edin
         followees.extend([f["username"] for f in response["users"]])
         next_max_id = response.get("next_max_id", None)
+    print("All Followees:", followees)  # Tüm takip edilenleri logla
     return set(followees)
 
 @app.post("/unfollowers/")
@@ -81,14 +83,17 @@ async def get_unfollowers(data: UnfollowersRequest):
 
         # Hedef kullanıcının takipçi ve takip edilen bilgilerini al
         user_id = api.username_info(data.target_username)["user"]["pk"]
+        print("Target User ID:", user_id)  # Hedef kullanıcı ID'sini logla
         followers = get_all_followers(api, user_id)
         followees = get_all_followees(api, user_id)
 
+        # Küme logları
+        print(f"Followers Set: {followers}")
+        print(f"Followees Set: {followees}")
+
         # Unfollowers hesapla
         unfollowers = followees - followers
-        print("Followers:", followers)
-        print("Followees:", followees)
-        print("Unfollowers:", unfollowers)
+        print("Unfollowers Set:", unfollowers)
         return {"unfollowers": list(unfollowers)}
 
     except ClientError as e:
