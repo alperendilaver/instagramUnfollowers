@@ -44,26 +44,24 @@ def recreate_session(username, password):
         raise Exception(f"Failed to recreate session: {e}")
 
 def get_all_followers(api, user_id):
-    """Kullanıcının tüm takipçilerini al."""
-    followers = []
+    followers = set()
     rank_token = api.generate_uuid()
-    next_max_id = ""
-    while next_max_id is not None:
+    next_max_id = None
+    while next_max_id != "":
         response = api.user_followers(user_id, rank_token=rank_token, max_id=next_max_id)
-        followers.extend([f["username"] for f in response["users"]])
-        next_max_id = response.get("next_max_id")
-    return set(followers)
+        followers.update([f["username"] for f in response["users"]])
+        next_max_id = response.get("next_max_id", None)
+    return followers
 
 def get_all_followees(api, user_id):
-    """Kullanıcının tüm takip ettiklerini al."""
-    followees = []
+    followees = set()
     rank_token = api.generate_uuid()
-    next_max_id = ""
-    while next_max_id is not None:
+    next_max_id = None
+    while next_max_id != "":
         response = api.user_following(user_id, rank_token=rank_token, max_id=next_max_id)
-        followees.extend([f["username"] for f in response["users"]])
-        next_max_id = response.get("next_max_id")
-    return set(followees)
+        followees.update([f["username"] for f in response["users"]])
+        next_max_id = response.get("next_max_id", None)
+    return followees
 
 @app.post("/unfollowers/")
 async def get_unfollowers(data: UnfollowersRequest):
@@ -82,8 +80,14 @@ async def get_unfollowers(data: UnfollowersRequest):
         followers = get_all_followers(api, user_id)
         followees = get_all_followees(api, user_id)
 
+          # Takipleşenleri hesapla
+        mutual_followers = followees & followers
+
         # Unfollowers hesapla
-        unfollowers = followees - followers
+        unfollowers = followees - mutual_followers
+        print(f"Followers: {len(followers)} - {followers}")
+        print(f"Followees: {len(followees)} - {followees}")
+
         return {"unfollowers": list(unfollowers)}
 
     except ClientError as e:
