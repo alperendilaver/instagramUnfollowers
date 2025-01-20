@@ -23,9 +23,8 @@ def get_instagram_follow_data(base64_session: str, username: str):
         # Instaloader ile session yükle
         instagram = instaloader.Instaloader()
 
-        # Doğru session dosya yolunu ayarla
-        instagram.context.session_filename = temp_session_file
-        instagram.load_session_from_file(temp_session_file)
+        # Doğrudan tam dosya yolunu kullanarak session yükle
+        instagram.load_session_from_file(filename=temp_session_file)
 
         # Instagram profiline erişim
         profile = instaloader.Profile.from_username(instagram.context, username)
