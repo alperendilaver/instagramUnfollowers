@@ -16,8 +16,6 @@ def get_instagram_follow_data(base64_session: str, username: str):
 
         temp_session_file = os.path.join(temp_dir, "session")
 
-        # Geçici dizin oluştur
-        os.makedirs(temp_dir, exist_ok=True)
 
         # Geçici session dosyasını oluştur
         with open(temp_session_file, "wb") as f:
