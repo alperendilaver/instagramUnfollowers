@@ -13,11 +13,10 @@ def get_instagram_follow_data(base64_session: str, username: str):
         # Base64 formatındaki session verisini çöz
         session_data = base64.b64decode(base64_session)
         temp_dir = "/tmp/instaloader-session"
-        session_file_name = "session_file"
+        temp_session_file = os.path.join(temp_dir, "session_file")
 
         # Geçici dizin oluştur
         os.makedirs(temp_dir, exist_ok=True)
-        temp_session_file = os.path.join(temp_dir, session_file_name)
 
         # Geçici session dosyasını oluştur
         with open(temp_session_file, "wb") as f:
@@ -25,8 +24,10 @@ def get_instagram_follow_data(base64_session: str, username: str):
 
         # Instaloader ile session yükle
         instagram = instaloader.Instaloader(dirname_pattern=temp_dir)
-        instagram.context.session_filename = temp_session_file  # Doğru dosya yolu belirleme
-        instagram.load_session_from_file(session_file_name)  # Sadece dosya adı kullanılmalı
+
+        # Doğru session dosya yolunu ayarla
+        instagram.context.session_filename = temp_session_file
+        instagram.load_session_from_file(temp_session_file)  # Burada tam dosya yolu kullanılıyor
 
         # Instagram profiline erişim
         profile = instaloader.Profile.from_username(instagram.context, username)
