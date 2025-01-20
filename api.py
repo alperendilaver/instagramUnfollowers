@@ -12,7 +12,8 @@ def get_instagram_follow_data(base64_session: str, username: str):
     try:
         # Base64 formatındaki session verisini çöz
         session_data = base64.b64decode(base64_session)
-        temp_dir = "/tmp/instaloader-session"
+        temp_dir = "/tmp/.instaloader-render"
+        
         temp_session_file = os.path.join(temp_dir, "session_file")
 
         # Geçici dizin oluştur
